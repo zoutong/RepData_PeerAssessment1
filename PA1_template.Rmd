@@ -1,25 +1,114 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research 1"
+author: "TZ"
+date: "November, 2015"
+output: html_document
 ---
+##Introduction
+
+The dataset for this project is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+The variables included in this dataset are:
+
+-steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+-date: The date on which the measurement was taken in YYYY-MM-DD format
+-interval: Identifier for the 5-minute interval in which measurement was taken
+
+##Loading and preprocessing the data
+
+The dataset is loaded to "amd". It appears that there are some missing values. For this part of the assignment, the missing values in the dataset are ignored.
+
+```{r}
+amd<-read.csv("activity.csv")
+
+```
+
+##What is mean total number of steps taken per day?
+
+The histgram (Fig. 1) of total number of steps per day is plotted. The mean steps per day is 10,766.2, and the median is 10,765.
+```{r}
+steps_per_day<-tapply(amd$steps,amd$date,sum)
+mean_steps<-mean(steps_per_day,na.rm=T)
+median_steps<-median(steps_per_day,na.rm=T)
+mean_steps
+median_steps
+```
 
 
-## Loading and preprocessing the data
+##What is the average daily activity pattern?
+
+A plot (Fig. 2) is made for daily activity pattern. The x-axis is the hour (0 is corresponding to 12 AM, and 1500 is corresponding to 3 PM). The y-axis is the average number of steps within the 5 minutes interval.From the plot, most steps (~206 steps) were walked during 8:35 AM and 8:40 AM.There appears to be 3 other peaks with ~100 average steps, at around 12 noon, 3:30 PM and 6:30 PM, respectively.
+
+```{r}
+steps_5min<-vector("numeric", length = 288) 
+hr24<-vector("numeric",length=288)
+for (i in 1:288) 
+  {timehr<-floor((i*5-5)/60);
+  timemi<-(i*5-5)%%60
+  hr24[i]<-timehr*100+timemi
+  amd_interval<-amd[amd$interval==hr24[i],]
+  steps_5min[i]<-mean(amd_interval$steps,na.rm=T)}
+which.max(steps_5min)
+hr24[which.max(steps_5min)]
+steps_5min[which.max(steps_5min)]
+```
 
 
+###Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+There are 2,304 days/intervals where there are missing values (coded as NA). 
 
-## What is mean total number of steps taken per day?
+##Imputing missing values
 
+In this study, it is assumed that the missing value equals to the mean steps at the same time interval of all other days with the step values.
+Once the missing values are replaced by the above strategy, it appears that the mean remains the same, and median of total daily steps only changes slightly.
 
+```{r}
+amd_complete<-amd[!is.na(amd$steps),]
+nrow(amd)-nrow(amd_complete)
+amd_full<-amd;
+for (i in 1:nrow(amd_full))
+  {num5<- floor(amd_full[i,3]/100)*12+amd_full[i,3]%%100/5+1;
+  if (is.na(amd_full[i,1])) {amd_full[i,1]<-steps_5min[num5]}
+  }
+nrow(amd_full[!is.na(amd_full$steps),])
+steps_per_day_full<-tapply(amd_full$steps,amd_full$date,sum)
+mean(steps_per_day_full)
+median(steps_per_day_full)
+```
 
-## What is the average daily activity pattern?
+##Are there differences in activity patterns between weekdays and weekends?
 
+###Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+```{r}
+dow<-weekdays(as.Date(amd$date))
+amd_full[,"doweek"]<-dow
+for (i in 1:nrow(amd_full))
+  {
+  if (amd_full[i,4]=="Saturday" || amd_full[i,4]=="Sunday") {amd_full[i,4]<-"weekend"}
+  else (amd_full[i,4]<-"weekday")
+  }
+steps_5min_wday<-vector("numeric",length=288)
+steps_5min_wend<-vector("numeric",length=288)
+for (i in 1:288) 
+  {
+  timehr<-floor((i*5-5)/60);
+  timemi<-(i*5-5)%%60
+  hr24[i]<-timehr*100+timemi
+  amd_interval<-amd_full[amd_full$interval==hr24[i],]
+  swday<-amd_interval[amd_interval$doweek=="weekday",]
+  swend<-amd_interval[amd_interval$doweek=="weekend",]
+  steps_5min_wday[i]<-mean(swday$steps,na.rm=T)
+  steps_5min_wend[i]<-mean(swend$steps,na.rm=T)
+  }
+```
 
+###Answer: There are differences in activity patterns
+As shown in the panel plot, the weekday activity peaks at 8:35 AM, with more than 200 average steps, with 3 other smaller peaks ranging from 80 to 120 steps. Whereaz during weekends, there steps are more evenly distributed, with about 5 peaks each of which is about 80 - 160 steps.
 
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=FALSE}
+hist(steps_per_day,breaks=10,main="Fig. 1")
+plot(hr24,steps_5min,main="Fig. 2")
+par(mfrow=c(1,2))
+plot(hr24,steps_5min_wday,type="l",main="Weekday 5-Minute")
+plot(hr24,steps_5min_wend,type="l",main="Weekend 5-Minute")
+```
